@@ -18,13 +18,27 @@ app.use((req, res, next) => {
 // Static images (for lesson images)
 import path from 'path'
 import { fileURLToPath } from 'url'
+import fs from 'fs'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const imagesDir = path.join(__dirname, 'public', 'images')
+
+// JSON-aware image middleware
+app.get('/images/:file', (req, res, next) => {
+	const filePath = path.join(imagesDir, req.params.file)
+	fs.access(filePath, fs.constants.F_OK, (err) => {
+		if (err) {
+			return res.status(404).json({ error: 'Image not found' })
+		}
+		res.sendFile(filePath)
+	})
+})
+
+// Also expose directory for direct linking
 app.use('/images', express.static(imagesDir))
 
 // MongoDB setup
-const mongoUri = process.env.MONGODB_URI || 'YOUR_MONGODB_ATLAS_CONNECTION_STRING_HERE'
+const mongoUri = process.env.MONGODB_URI || 'mongodb+srv://<db_username>:<db_password>@gpmvp.cfal0.mongodb.net/?retryWrites=true&w=majority&appName=GPMVP'
 const client = new MongoClient(mongoUri)
 let db
 
@@ -96,14 +110,15 @@ app.get('/search', async (req, res) => {
 			return res.json(all)
 		}
 		const regex = new RegExp(q, 'i')
+		const numericQ = Number(q)
+		const numericFilters = Number.isNaN(numericQ) ? [] : [{ price: numericQ }, { space: numericQ }]
 		const results = await database
 			.collection('lesson')
 			.find({
 				$or: [
 					{ topic: regex },
 					{ location: regex },
-					{ price: { $regex: regex } },
-					{ space: { $regex: regex } },
+					...numericFilters,
 				],
 			})
 			.toArray()
