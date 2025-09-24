@@ -8,6 +8,43 @@ const port = process.env.PORT || 3000
 app.use(cors())
 app.use(express.json())
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+	res.json({ status: 'OK', timestamp: new Date().toISOString() })
+})
+
+// Seed endpoint for initial setup
+app.post('/seed', async (req, res) => {
+	try {
+		const database = await connectDb()
+		const lessonsCollection = database.collection('lesson')
+		const ordersCollection = database.collection('order')
+
+		// Clear existing data
+		await lessonsCollection.deleteMany({})
+		await ordersCollection.deleteMany({})
+
+		const lessons = [
+			{ topic: 'Math', location: 'Hendon', price: 100, space: 5, image: 'math.png' },
+			{ topic: 'English', location: 'Colindale', price: 80, space: 5, image: 'english.png' },
+			{ topic: 'Science', location: 'Brent Cross', price: 90, space: 5, image: 'science.png' },
+			{ topic: 'History', location: 'Golders Green', price: 95, space: 5, image: 'history.png' },
+			{ topic: 'Geography', location: 'Hendon', price: 85, space: 5, image: 'geography.png' },
+			{ topic: 'Art', location: 'Colindale', price: 70, space: 5, image: 'art.png' },
+			{ topic: 'Music', location: 'Brent Cross', price: 110, space: 5, image: 'music.png' },
+			{ topic: 'CS', location: 'Golders Green', price: 120, space: 5, image: 'cs.png' },
+			{ topic: 'Physics', location: 'Hendon', price: 105, space: 5, image: 'physics.png' },
+			{ topic: 'Chemistry', location: 'Colindale', price: 98, space: 5, image: 'chemistry.png' },
+		]
+
+		await lessonsCollection.insertMany(lessons)
+		res.json({ message: 'Database seeded successfully', count: lessons.length })
+	} catch (err) {
+		console.error('Seed error:', err)
+		res.status(500).json({ error: 'Failed to seed database' })
+	}
+})
+
 // Logger middleware
 app.use((req, res, next) => {
 	const now = new Date().toISOString()
