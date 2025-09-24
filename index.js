@@ -95,12 +95,15 @@ app.get('/health', (req, res) => {
 // GET /lessons - return all lessons
 app.get('/lessons', async (req, res) => {
 	try {
+		console.log('Attempting to connect to database...')
 		const database = await connectDb()
+		console.log('Connected to database:', database.databaseName)
 		const lessons = await database.collection('lesson').find({}).toArray()
+		console.log('Found lessons:', lessons.length)
 		res.json(lessons)
 	} catch (err) {
-		console.error(err)
-		res.status(500).json({ error: 'Internal Server Error' })
+		console.error('Lessons endpoint error:', err)
+		res.status(500).json({ error: 'Internal Server Error', details: err.message })
 	}
 })
 
