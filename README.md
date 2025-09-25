@@ -26,3 +26,4 @@ npm install
 npm run seed  # Seed the database with sample lessons
 npm run dev   # Start development server
 ```
+
