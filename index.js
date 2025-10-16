@@ -8,6 +8,14 @@ const port = process.env.PORT || 3000
 app.use(cors())
 app.use(express.json())
 
+// Basic security headers
+app.use((req, res, next) => {
+	res.setHeader('X-Content-Type-Options', 'nosniff')
+	res.setHeader('X-Frame-Options', 'DENY')
+	res.setHeader('Referrer-Policy', 'no-referrer')
+	next()
+})
+
 // Health check endpoint
 app.get('/health', (req, res) => {
 	res.json({ status: 'OK', timestamp: new Date().toISOString() })
@@ -87,9 +95,6 @@ async function connectDb() {
 	return db
 }
 
-// Health
-app.get('/health', (req, res) => {
-	res.json({ status: 'ok' })
 })
 
 // GET /lessons - return all lessons
@@ -171,4 +176,15 @@ app.get('/search', async (req, res) => {
 
 app.listen(port, () => {
 	console.log(`Server listening on port ${port}`)
+})
+
+// Not found handler
+app.use((req, res) => {
+	res.status(404).json({ error: 'Not Found' })
+})
+
+// Error handler
+app.use((err, req, res, next) => {
+	console.error('Unhandled error:', err)
+	res.status(500).json({ error: 'Internal Server Error' })
 })
