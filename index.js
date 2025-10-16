@@ -112,16 +112,37 @@ app.get('/lessons', async (req, res) => {
 	}
 })
 
-// POST /orders - create new order
-app.post('/orders', async (req, res) => {
+
+app.post("/orders", async (req, res) => {
 	try {
 		const { name, phone, lessonIds, spaces } = req.body
-		if (!name || !phone || !Array.isArray(lessonIds) || typeof spaces !== 'number') {
-			return res.status(400).json({ error: 'Invalid payload' })
+		const phoneRegex = /^\+?[0-9\s-]{7,15}$/
+		if (!name || typeof name !== "string" || name.trim().length < 2) {
+			return res.status(400).json({ error: "Name is required" })
+		}
+		if (!phone || !phoneRegex.test(String(phone))) {
+			return res.status(400).json({ error: "Invalid phone number" })
+		}
+		if (!Array.isArray(lessonIds) || lessonIds.length === 0 || !Number.isInteger(spaces) || spaces <= 0) {
+			return res.status(400).json({ error: "Invalid order payload" })
 		}
 		const database = await connectDb()
-		const result = await database.collection('order').insertOne({ name, phone, lessonIds, spaces, createdAt: new Date() })
-		res.status(201).json({ _id: result.insertedId })
+		// Ensure lessons exist
+		const objectIds = lessonIds.map((id) => new ObjectId(id))
+		const lessons = await database.collection("lesson").find({ _id: { $in: objectIds } }).toArray()
+		if (lessons.length !== lessonIds.length) {
+			return res.status(400).json({ error: "One or more lessons not found" })
+		}
+		const result = await database.collection("order").insertOne({ name: name.trim(), phone: String(phone), lessonIds: objectIds, spaces, createdAt: new Date() })
+		return res.status(201).json({ _id: result.insertedId })
+	} catch (err) {
+		console.error(err)
+		return res.status(500).json({ error: "Internal Server Error" })
+	}
+})
+app.post('/orders', async (req, res) => {
+	try {
+		
 	} catch (err) {
 		console.error(err)
 		res.status(500).json({ error: 'Internal Server Error' })
