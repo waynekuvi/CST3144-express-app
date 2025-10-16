@@ -1,5 +1,6 @@
 import express from 'express'
 import cors from 'cors'
+import compression from 'compression'
 import { MongoClient, ObjectId } from 'mongodb'
 
 const app = express()
@@ -7,6 +8,7 @@ const port = process.env.PORT || 3000
 
 app.use(cors())
 app.use(express.json())
+app.use(compression())
 
 // Basic security headers
 app.use((req, res, next) => {
@@ -75,6 +77,8 @@ app.get('/images/:file', (req, res, next) => {
 		if (err) {
 			return res.status(404).json({ error: 'Image not found' })
 		}
+		// Short cache for faster repeat loads
+		res.set('Cache-Control', 'public, max-age=3600')
 		res.sendFile(filePath)
 	})
 })
@@ -95,7 +99,6 @@ async function connectDb() {
 	return db
 }
 
-})
 
 // GET /lessons - return all lessons
 app.get('/lessons', async (req, res) => {
@@ -105,7 +108,9 @@ app.get('/lessons', async (req, res) => {
 		console.log('Connected to database:', database.databaseName)
 		const lessons = await database.collection('lesson').find({}).toArray()
 		console.log('Found lessons:', lessons.length)
-		res.json(lessons)
+        // brief cache to improve perceived performance on first load
+        res.set('Cache-Control', 'public, max-age=30')
+        res.json(lessons)
 	} catch (err) {
 		console.error('Lessons endpoint error:', err)
 		res.status(500).json({ error: 'Internal Server Error', details: err.message })
@@ -140,14 +145,7 @@ app.post("/orders", async (req, res) => {
 		return res.status(500).json({ error: "Internal Server Error" })
 	}
 })
-app.post('/orders', async (req, res) => {
-	try {
-		
-	} catch (err) {
-		console.error(err)
-		res.status(500).json({ error: 'Internal Server Error' })
-	}
-})
+
 
 // PUT /lessons/:id - update any attribute(s) on a lesson
 app.put('/lessons/:id', async (req, res) => {
@@ -195,8 +193,26 @@ app.get('/search', async (req, res) => {
 	}
 })
 
-app.listen(port, () => {
-	console.log(`Server listening on port ${port}`)
+app.listen(port, async () => {
+    console.log(`Server listening on port ${port}`)
+    // Warm-up DB on boot
+    try {
+        const database = await connectDb()
+        await database.command({ ping: 1 })
+        console.log('DB warm-up ping ok')
+    } catch (e) {
+        console.warn('DB warm-up failed', e?.message)
+    }
+    // Keep-alive ping every 10 minutes (helps DB pool stay warm)
+    setInterval(async () => {
+        try {
+            const database = await connectDb()
+            await database.command({ ping: 1 })
+            console.log('keep-alive ping ok')
+        } catch (e) {
+            console.warn('keep-alive ping failed', e?.message)
+        }
+    }, 10 * 60 * 1000)
 })
 
 // Not found handler
